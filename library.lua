@@ -1,68 +1,62 @@
--- New example script written by wally
--- You can suggest changes with a pull request or something
-local InputService = game:GetService('UserInputService');
-local TextService = game:GetService('TextService');
-local CoreGui = game:GetService('CoreGui');
-local Teams = game:GetService('Teams');
-local Players = game:GetService('Players');
-local RunService = game:GetService('RunService')
-local TweenService = game:GetService('TweenService');
-local RenderStepped = RunService.RenderStepped;
-local LocalPlayer = Players.LocalPlayer;
-local Mouse = LocalPlayer:GetMouse();
+local cloneref = cloneref or function(...) return ...; end;
+local gethui = gethui or function() return cloneref(game:GetService("CoreGui")); end
 
-local FontHandler = {}
-local HttpService = game:GetService("HttpService")
-
-local fontsDir = "ecocide/fonts"
-
-if not isfolder(fontsDir) then
-    makefolder(fontsDir)
-end
-
-function FontHandler:New(Name, Weight, Style, Asset)
-    local fontPath = fontsDir .. "/" .. Asset.Id
-    local jsonPath = fontsDir .. "/" .. Name .. ".json"
-
-    -- Always write the font file
-    writefile(fontPath, game:HttpGet(Asset.Url))
-
-    -- Always write the descriptor file
-    local descriptor = {
-        name = Name,
-        faces = { {
-            name = "Regular",
-            weight = Weight,
-            style = Style,
-            assetId = getcustomasset(fontPath)
-        } }
-    }
-    writefile(jsonPath, HttpService:JSONEncode(descriptor))
-
-    return getcustomasset(jsonPath)
-end
-
-function FontHandler:Get(Name)
-    local jsonPath = fontsDir .. "/" .. Name .. ".json"
-    if isfile(jsonPath) then
-        return Font.new(getcustomasset(jsonPath))
+local GetService = setmetatable({}, {
+    __index = function(self, key)
+        return cloneref(game:GetService(key));
     end
+});
+
+local HUI = gethui(); -- Changed to use our gethui implementation
+local InputService = GetService.UserInputService;
+local TextService = GetService.TextService;
+local Teams = GetService.Teams;
+local Players = GetService.Players;
+local RunService = GetService.RunService;
+local TweenService = GetService.TweenService;
+local RenderStepped = RunService.RenderStepped;
+local ContentProvider = GetService.ContentProvider;
+
+-- ContentProvider
+do
+    function Hook(Object, Metamethod, Function)
+        local ClonedMetatable = table.clone(getrawmetatable(Object));
+        local OldMetamethod = ClonedMetatable[Metamethod];
+
+        ClonedMetatable[Metamethod] = newcclosure(Function);
+
+        setrawmetatable(Object, ClonedMetatable);
+    
+        return OldMetamethod;
+    end
+
+    local Old = nil; Old = Hook(ContentProvider, "__namecall", function(Self, ...)
+        local Method = getnamecallmethod();
+
+        if (Method == "GetAssetFetchStatus") then
+            return Enum.AssetFetchStatus.None;
+        end
+
+        return Old(Self, ...);
+    end)
 end
 
-FontHandler:New("ProggyClean", 200, "normal", {
-    Id = "ProggyClean.ttf",
-    Url = "https://github.com/SzNeo8083/SzNeo8083.github.io/raw/refs/heads/main/fonts/ProggyClean.ttf"
-})
+local Mouse = setmetatable({}, {
+    __index = function(self, key)
+        local mouse_location = InputService:GetMouseLocation();
 
-local UIFont = FontHandler:Get("ProggyClean")
+        if (key == "X") then
+            return mouse_location.X;
+        elseif (key == "Y") then
+            return mouse_location.Y - 58;
+        end
 
-local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
+        return mouse_location;
+    end
+});
 
-local ScreenGui = Instance.new('ScreenGui');
-ProtectGui(ScreenGui);
-
+local ScreenGui = Instance.new('ScreenGui', HUI);
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
-ScreenGui.Parent = gethui() or CoreGui;
 
 local Toggles = {};
 local Options = {};
@@ -77,16 +71,14 @@ local Library = {
     HudRegistry = {};
 
     FontColor = Color3.fromRGB(255, 255, 255);
-    MainColor = Color3.fromRGB(36,36,36);
-    BackgroundColor = Color3.fromRGB(28,28,28);
-    AccentColor = Color3.fromRGB(131,141,199);
-    OutlineColor = Color3.fromRGB(55,55,55);
+    MainColor = Color3.fromRGB(28, 28, 28);
+    BackgroundColor = Color3.fromRGB(20, 20, 20);
+    AccentColor = Color3.fromRGB(0, 85, 255);
+    OutlineColor = Color3.fromRGB(50, 50, 50);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
     Font = Enum.Font.Code,
-    CFont = UIFont,
-    FontSize = 12,
 
     OpenedFrames = {};
     DependencyBoxes = {};
@@ -195,9 +187,9 @@ end;
 function Library:CreateLabel(Properties, IsHud)
     local _Instance = Library:Create('TextLabel', {
         BackgroundTransparency = 1;
-        FontFace = Library.CFont;
+        Font = Library.Font;
         TextColor3 = Library.FontColor;
-        TextSize = Library.FontSize;
+        TextSize = 16;
         TextStrokeTransparency = 0;
     });
 
@@ -254,7 +246,7 @@ function Library:AddToolTip(InfoStr, HoverInstance)
     local Label = Library:CreateLabel({
         Position = UDim2.fromOffset(3, 1),
         Size = UDim2.fromOffset(X, Y);
-        TextSize = Library.FontSize;
+        TextSize = 14;
         Text = InfoStr,
         TextColor3 = Library.FontColor,
         TextXAlignment = Enum.TextXAlignment.Left;
@@ -637,12 +629,12 @@ do
             BackgroundTransparency = 1;
             Position = UDim2.new(0, 5, 0, 0);
             Size = UDim2.new(1, -5, 1, 0);
-            FontFace = Library.CFont;
+            Font = Library.Font;
             PlaceholderColor3 = Color3.fromRGB(190, 190, 190);
             PlaceholderText = 'Hex color',
             Text = '#FFFFFF',
             TextColor3 = Library.FontColor;
-            TextSize = Library.FontSize;
+            TextSize = 14;
             TextStrokeTransparency = 0;
             TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 20,
@@ -707,7 +699,7 @@ do
             Size = UDim2.new(1, 0, 0, 14);
             Position = UDim2.fromOffset(5, 5);
             TextXAlignment = Enum.TextXAlignment.Left;
-            TextSize = Library.FontSize;
+            TextSize = 14;
             Text = ColorPicker.Title,--Info.Default;
             TextWrapped = false;
             ZIndex = 16;
@@ -796,7 +788,7 @@ do
                 local Button = Library:CreateLabel({
                     Active = false;
                     Size = UDim2.new(1, 0, 0, 15);
-                    TextSize = Library.FontSize;
+                    TextSize = 13;
                     Text = Str;
                     ZIndex = 16;
                     Parent = self.Inner;
@@ -1096,7 +1088,7 @@ do
 
         local DisplayLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
-            TextSize = Library.FontSize;
+            TextSize = 13;
             Text = Info.Default;
             TextWrapped = true;
             ZIndex = 8;
@@ -1139,7 +1131,7 @@ do
         local ContainerLabel = Library:CreateLabel({
             TextXAlignment = Enum.TextXAlignment.Left;
             Size = UDim2.new(1, 0, 0, 18);
-            TextSize = Library.FontSize;
+            TextSize = 13;
             Visible = false;
             ZIndex = 110;
             Parent = Library.KeybindContainer;
@@ -1154,7 +1146,7 @@ do
             local Label = Library:CreateLabel({
                 Active = false;
                 Size = UDim2.new(1, 0, 0, 15);
-                TextSize = Library.FontSize;
+                TextSize = 13;
                 Text = Mode;
                 ZIndex = 16;
                 Parent = ModeSelectInner;
@@ -1407,7 +1399,7 @@ do
 
         local TextLabel = Library:CreateLabel({
             Size = UDim2.new(1, -4, 0, 15);
-            TextSize = Library.FontSize;
+            TextSize = 14;
             Text = Text;
             TextWrapped = DoesWrap or false,
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -1494,7 +1486,7 @@ do
 
             local Label = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 1, 0);
-                TextSize = Library.FontSize;
+                TextSize = 14;
                 Text = Button.Text;
                 ZIndex = 6;
                 Parent = Inner;
@@ -1694,7 +1686,7 @@ do
 
         local InputLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 0, 15);
-            TextSize = Library.FontSize;
+            TextSize = 14;
             Text = Info.Text;
             TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 5;
@@ -1760,13 +1752,13 @@ do
             Position = UDim2.fromOffset(0, 0),
             Size = UDim2.fromScale(5, 1),
 
-            FontFace = Library.CFont;
+            Font = Library.Font;
             PlaceholderColor3 = Color3.fromRGB(190, 190, 190);
             PlaceholderText = Info.Placeholder or '';
 
             Text = Info.Default or '';
             TextColor3 = Library.FontColor;
-            TextSize = Library.FontSize;
+            TextSize = 14;
             TextStrokeTransparency = 0;
             TextXAlignment = Enum.TextXAlignment.Left;
 
@@ -1907,7 +1899,7 @@ do
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 216, 1, 0);
             Position = UDim2.new(1, 6, 0, 0);
-            TextSize = Library.FontSize;
+            TextSize = 14;
             Text = Info.Text;
             TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 6;
@@ -2024,7 +2016,7 @@ do
         if not Info.Compact then
             Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 10);
-                TextSize = Library.FontSize;
+                TextSize = 14;
                 Text = Info.Text;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 TextYAlignment = Enum.TextYAlignment.Bottom;
@@ -2089,7 +2081,7 @@ do
 
         local DisplayLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
-            TextSize = Library.FontSize;
+            TextSize = 14;
             Text = 'Infinite';
             ZIndex = 9;
             Parent = SliderInner;
@@ -2230,7 +2222,7 @@ do
         if not Info.Compact then
             local DropdownLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 10);
-                TextSize = Library.FontSize;
+                TextSize = 14;
                 Text = Info.Text;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 TextYAlignment = Enum.TextYAlignment.Bottom;
@@ -2295,7 +2287,7 @@ do
         local ItemList = Library:CreateLabel({
             Position = UDim2.new(0, 5, 0, 0);
             Size = UDim2.new(1, -5, 1, 0);
-            TextSize = Library.FontSize;
+            TextSize = 14;
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
             TextWrapped = true;
@@ -2445,7 +2437,7 @@ do
                     Active = false;
                     Size = UDim2.new(1, -6, 1, 0);
                     Position = UDim2.new(0, 6, 0, 0);
-                    TextSize = Library.FontSize;
+                    TextSize = 14;
                     Text = Value;
                     TextXAlignment = Enum.TextXAlignment.Left;
                     ZIndex = 25;
@@ -2796,7 +2788,7 @@ do
     local WatermarkLabel = Library:CreateLabel({
         Position = UDim2.new(0, 5, 0, 0);
         Size = UDim2.new(1, -4, 1, 0);
-        TextSize = Library.FontSize;
+        TextSize = 14;
         TextXAlignment = Enum.TextXAlignment.Left;
         ZIndex = 203;
         Parent = InnerFrame;
@@ -2950,7 +2942,7 @@ function Library:Notify(Text, Time)
         Size = UDim2.new(1, -4, 1, 0);
         Text = Text;
         TextXAlignment = Enum.TextXAlignment.Left;
-        TextSize = Library.FontSize;
+        TextSize = 14;
         ZIndex = 103;
         Parent = InnerFrame;
     });
@@ -3277,7 +3269,7 @@ function Library:CreateWindow(...)
             local GroupboxLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 18);
                 Position = UDim2.new(0, 4, 0, 2);
-                TextSize = Library.FontSize;
+                TextSize = 14;
                 Text = Info.Name;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 ZIndex = 5;
@@ -3406,7 +3398,7 @@ function Library:CreateWindow(...)
 
                 local ButtonLabel = Library:CreateLabel({
                     Size = UDim2.new(1, 0, 1, 0);
-                    TextSize = Library.FontSize;
+                    TextSize = 14;
                     Text = Name;
                     TextXAlignment = Enum.TextXAlignment.Center;
                     ZIndex = 7;
